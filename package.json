@@ -1,8 +1,10 @@
 {
   "name": "mdrewriter",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "1.0.1",
+  "description": "Fast streaming HTML-to-markdown converter, 100% CommonMark + GFM",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "keywords": [
     "markdown",
     "html-to-markdown",

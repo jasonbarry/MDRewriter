@@ -1,226 +1,164 @@
 # MDRewriter
 
-## Concept
+Converts HTML to Markdown in a stream — no DOM, no buffering. Drop-in replacement for [HTMLRewriter](https://developers.cloudflare.com/workers/runtime-apis/html-rewriter/) for all markdown use cases.
 
-Streaming HTML-to-Markdown transformer with a jQuery-like selector API.
-Think HTMLRewriter but the output is CommonMark-spec Markdown instead of HTML.
+- **Streaming** — first Markdown bytes emit before the HTML finishes downloading
+- **5-6x faster** than Turndown and node-html-markdown for string conversions
+- **CommonMark + GFM extensions** — 100% spec-compliant with 1,000+ tests passing
+- **Constant memory** — no DOM construction, so it works anywhere: Node, Bun, Deno, Cloudflare Workers
 
-## API Design
+## Install
+
+```sh
+npm i mdrewriter
+```
+
+## Usage
+
+### String in, string out
 
 ```typescript
 import { MDRewriter } from "mdrewriter";
 
-// Basic: stream HTML response to Markdown
-const md = new MDRewriter().transform(response); // Returns Response with MD body
-
-// With selectors: customize how elements become Markdown
-const md = new MDRewriter()
-  .on("h1, h2, h3", {
-    element(el) {
-      // el.tagName, el.attributes, etc.
-      el.prefix = "## "; // override the default heading level
-    },
-  })
-  .on("a.internal-link", {
-    element(el) {
-      // rewrite link targets during conversion
-      const href = el.getAttribute("href");
-      el.setAttribute("href", href.replace("/docs/", "/wiki/"));
-    },
-  })
-  .on("div.sidebar", {
-    element(el) {
-      el.remove(); // strip sidebars from markdown output
-    },
-  })
-  .on("div.callout", {
-    element(el) {
-      // wrap in blockquote with emoji prefix
-      el.prefix = "> **Note:** ";
-      el.suffix = "\n";
-    },
-  })
-  .on("code[data-lang]", {
-    element(el) {
-      // override language hint for fenced code blocks
-      el.setLanguage(el.getAttribute("data-lang"));
-    },
-  })
-  .on("img", {
-    element(el) {
-      // transform image URLs
-      const src = el.getAttribute("src");
-      if (src.startsWith("/")) {
-        el.setAttribute("src", `https://cdn.example.com${src}`);
-      }
-    },
-  })
-  .ignore("nav, footer, .ads, script, style") // sugar for .on(sel, { element(el) { el.remove() } })
-  .transform(response);
-```
-
-## Core Architecture
-
-```
-HTTP Response (HTML stream)
-    |
-    v
-[SAX-like streaming HTML parser]  -- emits tokens: open tag, text, close tag
-    |
-    v
-[Selector matcher]  -- matches CSS selectors against streaming token state
-    |                   (maintains a lightweight stack, NOT a full DOM)
-    v
-[User handlers]  -- .on() callbacks fire, can modify/remove/annotate
-    |
-    v
-[Markdown emitter]  -- converts token stream to CommonMark
-    |                   (maintains indent/list/blockquote stack)
-    v
-ReadableStream (Markdown text)
-```
-
-### Key design decisions:
-
-1. **No DOM construction** - operates on a token stream like HTMLRewriter
-2. **Streaming** - first bytes of Markdown output before HTML finishes downloading
-3. **Stack-based context** - tracks nesting (list depth, blockquote depth, etc.)
-4. **CommonMark-spec** - output should pass commonmark.js roundtrip for supported elements
-
-## Default HTML → Markdown Mappings
-
-| HTML                    | Markdown                |
-| ----------------------- | ----------------------- |
-| `<h1>` - `<h6>`         | `#` - `######`          |
-| `<p>`                   | double newline          |
-| `<strong>`, `<b>`       | `**text**`              |
-| `<em>`, `<i>`           | `*text*`                |
-| `<code>`                | `` `text` ``            |
-| `<pre><code>`           | fenced code block ```   |
-| `<a href>`              | `[text](url)`           |
-| `<img>`                 | `![alt](src)`           |
-| `<ul>/<li>`             | `- item`                |
-| `<ol>/<li>`             | `1. item`               |
-| `<blockquote>`          | `> text`                |
-| `<hr>`                  | `---`                   |
-| `<br>`                  | double space + newline  |
-| `<table>`               | GFM table (pipe syntax) |
-| `<del>`, `<s>`          | `~~text~~`              |
-| `<input type=checkbox>` | `- [ ]` / `- [x]`       |
-
-## Streaming Challenge: The Link Problem
-
-The hardest part of streaming HTML→MD is `<a href="url">text</a>`.
-In Markdown, links are `[text](url)` - you need the href BEFORE the text content.
-But in streaming HTML, you get the href in the open tag, then text, then close tag.
-This works perfectly because the open tag has the href attribute!
-
-The ACTUAL hard case is reference-style links `[text][id]` with `[id]: url` at bottom.
-Solution: don't use reference-style by default. Inline links stream fine.
-
-Other streaming challenges:
-
-- **Tables**: need to know column count from first row to emit header separator
-  Solution: buffer first `<tr>` to count columns, then stream the rest
-- **Nested lists**: need indent tracking
-  Solution: maintain a depth counter on the stack
-
-## Element API (for handlers)
-
-```typescript
-interface MDElement {
-  // Read-only properties
-  readonly tagName: string;
-  readonly attributes: IterableIterator<[string, string]>;
-  readonly removed: boolean;
-
-  // Attribute access
-  getAttribute(name: string): string | null;
-  hasAttribute(name: string): boolean;
-
-  // Mutations (affect markdown output)
-  setAttribute(name: string, value: string): MDElement;
-  remove(): MDElement; // remove element and children from output
-  removeAndKeepContent(): MDElement; // unwrap: keep text, lose the element
-
-  // Markdown-specific
-  prefix: string; // prepend to markdown output of this element
-  suffix: string; // append to markdown output of this element
-  setLanguage(lang: string): void; // for code blocks
-
-  // Content insertion
-  before(content: string): MDElement;
-  after(content: string): MDElement;
-  replace(content: string): MDElement;
-
-  // End tag handler
-  onEndTag(handler: (tag: MDEndTag) => void | Promise<void>): void;
-}
-```
-
-## Usage with Cloudflare Workers
-
-```typescript
-export default {
-  async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
-    const target = url.searchParams.get("url");
-
-    const response = await fetch(target);
-
-    return new MDRewriter()
-      .ignore("nav, header, footer, script, style, .ads")
-      .on("article", {
-        element(el) {
-          el.removeAndKeepContent();
-        },
-      })
-      .transform(response, {
-        headers: { "content-type": "text/markdown; charset=utf-8" },
-      });
-  },
-};
-```
-
-## Usage with Node.js / Bun / Deno
-
-```typescript
-import { MDRewriter } from "mdrewriter";
-
-// Works with any Response object (Fetch API)
-const res = await fetch("https://example.com");
-const mdResponse = new MDRewriter().transform(res);
-const markdown = await mdResponse.text();
-
-// Also works with ReadableStreams directly
-const mdStream = new MDRewriter().transform(htmlReadableStream);
-
-// Or just strings
 const markdown = new MDRewriter().transform("<h1>Hello</h1><p>World</p>");
 // => "# Hello\n\nWorld\n"
 ```
 
-## Why This Matters
+### Stream a fetch response
 
-Turndown (the current standard) buffers the entire DOM before converting.
-For a 500KB HTML page, that means:
+```typescript
+const response = await fetch("https://example.com");
+const mdResponse = new MDRewriter().transform(response);
+// => Response
+```
 
-1. Download entire page
-2. Parse into DOM (jsdom or browser)
-3. Walk DOM tree
-4. Emit markdown
+### `.on(selector, handler)` — customize conversion
 
-MDRewriter would:
+```typescript
+const md = new MDRewriter()
+  .on("a.internal", {
+    element(el) {
+      const href = el.getAttribute("href");
+      el.setAttribute("href", href.replace("/docs/", "/wiki/"));
+    },
+  })
+  .on("code[data-lang]", {
+    element(el) {
+      el.setLanguage(el.getAttribute("data-lang"));
+    },
+  })
+  .transform(response);
+```
 
-1. Start emitting markdown as the first HTML bytes arrive
-2. Never build a DOM
-3. Use constant memory regardless of page size
-4. Work on edge/serverless where jsdom isn't available
+### `.ignore(selector)` — strip elements
 
-This makes it ideal for:
+```typescript
+const md = new MDRewriter()
+  .ignore("nav, footer, .ads, script, style")
+  .transform(response);
+```
 
-- Edge workers converting pages on-the-fly
-- AI/LLM pipelines that need web content as markdown
-- RSS/feed processors
-- Web scrapers
-- Documentation site generators
+### Before / After
+
+**Before** — HTMLRewriter to extract content, then Turndown to convert:
+
+```typescript
+import TurndownService from "turndown";
+
+const turndown = new TurndownService();
+
+export default {
+  async fetch(request: Request): Promise<Response> {
+    const response = await fetch(request.url);
+
+    // Buffer the entire page into a string
+    let html = "";
+    const rewriter = new HTMLRewriter()
+      .on("nav, footer, script, style, .ads", {
+        element(el) {
+          el.remove();
+        },
+      })
+      .on("article, p", {
+        text(text) {
+          html += text.text;
+        },
+      });
+
+    await rewriter.transform(response).text();
+
+    // Then convert the buffered HTML to Markdown
+    const markdown = turndown.turndown(html);
+    return new Response(markdown, {
+      headers: { "content-type": "text/markdown" },
+    });
+  },
+};
+```
+
+**After** — MDRewriter does both in a single streaming pass:
+
+```typescript
+import { MDRewriter } from "mdrewriter";
+
+export default {
+  async fetch(request: Request): Promise<Response> {
+    const res = await fetch(request.url);
+
+    return new MDRewriter()
+      .ignore("nav, footer, script, style, .ads")
+      .transform(res);
+  },
+};
+```
+
+## Benchmarks
+
+### Scaling with page size
+
+MDRewriter's advantage grows as pages get larger. On a log-log scatterplot of p99 latency vs DOM node count:
+
+![p99 latency vs DOM nodes](docs/scatterplot.png)
+
+```
+$ pnpm bench
+```
+
+![benchmarks comparing turndown, node-html-markdown, and mdrewriter](docs/bench-table.png)
+
+### htmlparser-benchmark (258 real-world HTML files)
+
+Across 258 real-world HTML files, MDRewriter averages **1.16 ms/file** — 4.6x faster than Turndown and 6x faster than node-html-markdown. These results are from the [htmlparser-benchmark](https://www.npmjs.com/package/htmlparser-benchmark) benchmark:
+
+```
+$ pnpm bench:parser
+
+Benchmarking against 258 real-world HTML files…
+
+  MDRewriter: 258/258
+  Turndown: 258/258
+  node-html-markdown: 258/258
+
+Results (ms/file):
+
+| Library             |    Mean |      ± SD |
+|---------------------|---------|-----------|
+| MDRewriter          | 1.15806 |  0.793826 |
+| Turndown            | 5.39425 |   3.36502 |
+| node-html-markdown  | 7.01406 |   7.10821 |
+
+Speedup vs MDRewriter:
+
+  Turndown: 4.66x slower
+  node-html-markdown: 6.06x slower
+```
+
+## Compliance
+
+- **CommonMark** — 652 spec examples pass roundtrip conversion
+- **GFM extensions** — tables, strikethrough, task lists, autolinks (24 spec examples)
+- **1,028 tests** across 9 test suites
+
+## License
+
+MIT
