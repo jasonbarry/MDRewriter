@@ -10,6 +10,7 @@
   },
   "formatter": {
     "enabled": true,
+    "includes": ["src/**"],
     "indentStyle": "space"
   },
   "linter": {
@@ -26,6 +27,7 @@
   },
   "assist": {
     "enabled": true,
+    "includes": ["src/**"],
     "actions": {
       "source": {
         "organizeImports": "on"

@@ -457,9 +457,9 @@ describe("End Tag Handling", () => {
     rewrite("<p>Hello</p>", (r) =>
       r.on("p", {
         element(el) {
-          el.onEndTag(() => order.push(1));
-          el.onEndTag(() => order.push(2));
-          el.onEndTag(() => order.push(3));
+          el.onEndTag(() => { order.push(1); });
+          el.onEndTag(() => { order.push(2); });
+          el.onEndTag(() => { order.push(3); });
         },
       }),
     );

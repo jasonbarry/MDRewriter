@@ -200,49 +200,6 @@ const markdown = new MDRewriter().transform("<h1>Hello</h1><p>World</p>");
 // => "# Hello\n\nWorld\n"
 ```
 
-## Test Strategy
-
-1. **CommonMark roundtrip tests**: Convert HTML→MD, then parse MD with commonmark.js,
-   verify the semantic structure matches
-2. **Streaming correctness**: Verify output is identical whether input arrives as
-   one chunk or byte-by-byte
-3. **HTMLRewriter API parity**: Test that selector matching behaves identically
-4. **Turndown test suite**: Turndown (the leading HTML→MD lib) has tests we can
-   validate against
-5. **Real-world pages**: Crawl top 100 sites, convert, verify no crashes/hangs
-
-## Implementation Plan
-
-### Phase 1: Core streaming parser + emitter (no selectors)
-
-- Streaming HTML tokenizer (or use existing: htmlparser2 is already streaming)
-- Stack-based markdown emitter
-- All default mappings working
-- String + Response + ReadableStream inputs
-- CommonMark-spec output
-
-### Phase 2: Selector engine
-
-- CSS selector matching on streaming token state
-- .on() handler registration
-- .ignore() sugar
-- Element mutation API
-
-### Phase 3: Edge cases + polish
-
-- Table support (with buffering)
-- Nested list edge cases
-- Code block language detection
-- GFM extensions (strikethrough, task lists, tables)
-- Performance benchmarks vs Turndown
-
-### Phase 4: Publish
-
-- npm package
-- Cloudflare Workers example
-- Benchmarks showing streaming advantage over Turndown
-- README with comparison
-
 ## Why This Matters
 
 Turndown (the current standard) buffers the entire DOM before converting.

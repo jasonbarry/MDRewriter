@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import { NodeHtmlMarkdown } from "node-html-markdown";
 import TurndownService from "turndown";
-import { MDRewriter } from "../src/index.ts";
+import { MDRewriter } from "../src/index";
 
 const require = createRequire(import.meta.url);
 const Benchmark = require("htmlparser-benchmark");

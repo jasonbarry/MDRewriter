@@ -1,5 +1,5 @@
 /**
- * Downloads HTML from real-world sites and saves to test/fixtures/real-world/.
+ * Downloads HTML from real-world sites and saves to test/fixtures/html/.
  * Run with: bun test/download-fixtures.ts
  */
 
@@ -48,7 +48,7 @@ function urlToFilename(url: string): string {
 async function main() {
   const __dirname =
     import.meta.dirname ?? dirname(fileURLToPath(import.meta.url));
-  const dir = join(__dirname, "..", "test", "fixtures", "real-world");
+  const dir = join(__dirname, "..", "test", "fixtures", "html");
   mkdirSync(dir, { recursive: true });
 
   let downloaded = 0;
@@ -70,7 +70,7 @@ async function main() {
         signal: AbortSignal.timeout(15_000),
         headers: {
           "User-Agent":
-            "Mozilla/5.0 (compatible; MDRewriter-Test/1.0; +https://github.com/example/mdrewriter)",
+            "Mozilla/5.0 (compatible; MDRewriter-Test/1.0; +https://github.com/jasonbarry/mdrewriter)",
           Accept: "text/html",
         },
         redirect: "follow",
