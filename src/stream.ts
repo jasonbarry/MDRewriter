@@ -36,7 +36,11 @@ export function htmlToMarkdown(
   documentHandlers?: DocumentHandler[],
 ): string {
   const chunks: string[] = [];
-  const stream = createMarkdownStream((chunk) => chunks.push(chunk), handlers, documentHandlers);
+  const stream = createMarkdownStream(
+    (chunk) => chunks.push(chunk),
+    handlers,
+    documentHandlers,
+  );
   stream.write(html);
   stream.end();
   return chunks.join("");
@@ -52,14 +56,18 @@ export function createMarkdownStream(
   const hasHandlers = handlers != null && handlers.length > 0;
 
   // Collect all comment handlers from registrations (fire for ALL comments)
-  const streamCommentHandlers: Array<(comment: MDComment) => void | Promise<void>> = [];
+  const streamCommentHandlers: Array<
+    (comment: MDComment) => void | Promise<void>
+  > = [];
   if (hasHandlers) {
     for (const reg of handlers as HandlerRegistration[]) {
-      if (reg.handler.comments) streamCommentHandlers.push(reg.handler.comments);
+      if (reg.handler.comments)
+        streamCommentHandlers.push(reg.handler.comments);
     }
   }
 
-  const hasDocHandlers = documentHandlers != null && documentHandlers.length > 0;
+  const hasDocHandlers =
+    documentHandlers != null && documentHandlers.length > 0;
 
   // Virtual root context for sibling/child tracking at top level
   const virtualRoot: MatchContext = {
@@ -73,7 +81,10 @@ export function createMarkdownStream(
     prevChildCtxs: [],
   };
   // Track child counts per parent MatchContext: { count, tagCounts }
-  const childTrackers = new Map<MatchContext, { count: number; tagCounts: Map<string, number> }>();
+  const childTrackers = new Map<
+    MatchContext,
+    { count: number; tagCounts: Map<string, number> }
+  >();
   // Push virtualRoot into matchStack so sibling combinators can see it as a parent
   if (hasHandlers) matchStack.push(virtualRoot);
 
@@ -305,7 +316,11 @@ export function createMarkdownStream(
     // block children of list/table/blockquote containers.  Plain spaces
     // without newlines are inline and must be preserved.
     const parent = stack[stack.length - 1];
-    if (parent && WHITESPACE_SUPPRESS_TAGS.has(parent.tag) && text.includes("\n")) {
+    if (
+      parent &&
+      WHITESPACE_SUPPRESS_TAGS.has(parent.tag) &&
+      text.includes("\n")
+    ) {
       return;
     }
 
@@ -653,7 +668,10 @@ export function createMarkdownStream(
         // --- Handler matching ---
         if (hasHandlers && !rawBlockContinuation && rawHtmlDepth === 0) {
           // Update child/sibling tracking for pseudo-classes and combinators
-          const parentCtx = matchStack.length > 0 ? matchStack[matchStack.length - 1] : virtualRoot;
+          const parentCtx =
+            matchStack.length > 0
+              ? matchStack[matchStack.length - 1]
+              : virtualRoot;
           let tracker = childTrackers.get(parentCtx);
           if (!tracker) {
             tracker = { count: 0, tagCounts: new Map() };
@@ -675,7 +693,8 @@ export function createMarkdownStream(
               const el = createMDElement(frame);
               if (reg.handler.element) reg.handler.element(el);
               if (reg.handler.text) frame.textHandlers.push(reg.handler.text);
-              if (reg.handler.comments) frame.commentHandlers.push(reg.handler.comments);
+              if (reg.handler.comments)
+                frame.commentHandlers.push(reg.handler.comments);
             }
           }
           matchStack.pop(); // will be re-pushed by pushFrame
@@ -1089,12 +1108,24 @@ export function createMarkdownStream(
         // Fire document-level text handlers
         if (hasDocHandlers) {
           const chunk: MDText = {
-            get text() { return rawText; },
-            get lastInTextNode() { return true; },
-            before() { return chunk; },
-            after() { return chunk; },
-            replace() { return chunk; },
-            remove() { return chunk; },
+            get text() {
+              return rawText;
+            },
+            get lastInTextNode() {
+              return true;
+            },
+            before() {
+              return chunk;
+            },
+            after() {
+              return chunk;
+            },
+            replace() {
+              return chunk;
+            },
+            remove() {
+              return chunk;
+            },
           };
           for (const dh of documentHandlers as DocumentHandler[]) {
             if (dh.text) dh.text(chunk);
@@ -1213,7 +1244,8 @@ export function createMarkdownStream(
 
         // Fire text handlers from ancestor frames
         if (hasHandlers) {
-          const allTextHandlers: Array<(text: MDText) => void | Promise<void>> = [];
+          const allTextHandlers: Array<(text: MDText) => void | Promise<void>> =
+            [];
           for (let si = 0; si < stack.length; si++) {
             for (const th of stack[si].textHandlers) allTextHandlers.push(th);
           }
@@ -1223,12 +1255,28 @@ export function createMarkdownStream(
             let _replacement: string | null = null;
             let _removed = false;
             const chunk: MDText = {
-              get text() { return text; },
-              get lastInTextNode() { return true; },
-              before(c: string) { _before += c; return chunk; },
-              after(c: string) { _after += c; return chunk; },
-              replace(c: string) { _replacement = c; return chunk; },
-              remove() { _removed = true; return chunk; },
+              get text() {
+                return text;
+              },
+              get lastInTextNode() {
+                return true;
+              },
+              before(c: string) {
+                _before += c;
+                return chunk;
+              },
+              after(c: string) {
+                _after += c;
+                return chunk;
+              },
+              replace(c: string) {
+                _replacement = c;
+                return chunk;
+              },
+              remove() {
+                _removed = true;
+                return chunk;
+              },
             };
             for (const th of allTextHandlers) th(chunk);
             if (_removed) {
@@ -1328,400 +1376,401 @@ export function createMarkdownStream(
         flushPendingWS();
 
         {
+          // Raw HTML passthrough
+          if (rawHtmlDepth > 0) {
+            const matchesStack =
+              stack.length > 0 && stack[stack.length - 1].tag === name;
 
-        // Raw HTML passthrough
-        if (rawHtmlDepth > 0) {
-          const matchesStack =
-            stack.length > 0 && stack[stack.length - 1].tag === name;
+            // If the OPEN event was a reinterpreted close tag (</p> → <p></p>),
+            // just pop without emitting or changing depth
+            if (matchesStack && stack[stack.length - 1].attrs._skipClose) {
+              popFrame();
+              lastEventEnd = parser.endIndex;
+              return;
+            }
 
-          // If the OPEN event was a reinterpreted close tag (</p> → <p></p>),
-          // just pop without emitting or changing depth
-          if (matchesStack && stack[stack.length - 1].attrs._skipClose) {
-            popFrame();
+            if (isImplied) {
+              // Implied close — don't emit, just adjust depth
+              if (!VOID_ELEMENTS.has(name)) {
+                rawHtmlDepth--;
+              }
+              if (matchesStack) popFrame();
+            } else if (matchesStack) {
+              // Matched real close tag
+              rawHtmlDepth--;
+              emitRaw(getRawSlice(parser.startIndex, parser.endIndex));
+              popFrame();
+            } else {
+              // Unmatched real close tag in raw block — emit but don't change depth
+              emitRaw(getRawSlice(parser.startIndex, parser.endIndex));
+            }
+            if (rawHtmlDepth === 0) {
+              rawBlockContinuation = TYPE1_TAGS.has(name)
+                ? "sameline"
+                : "blankline";
+            }
+            if (!isImplied) lastEventEnd = parser.endIndex;
+            return;
+          }
+
+          // Unmatched closing tag — emit as raw HTML
+          const topFrame = stack[stack.length - 1];
+          if (!topFrame || topFrame.tag !== name) {
+            // Implied close of never-opened tag — no source content to emit
+            if (isImplied) {
+              lastEventEnd = parser.startIndex - 1;
+              return;
+            }
+            const inInline =
+              isInsideTag("p") || isInsideTag("li") || !!collectingFrame();
+            if (inInline) {
+              emitOrCollect(getRawSlice(parser.startIndex, parser.endIndex));
+            } else if (!CONVERTED_TAGS.has(name)) {
+              ensureBlankLine();
+              emitRaw(getRawSlice(parser.startIndex, parser.endIndex));
+              rawBlockContinuation = "blankline";
+            }
             lastEventEnd = parser.endIndex;
             return;
           }
 
-          if (isImplied) {
-            // Implied close — don't emit, just adjust depth
-            if (!VOID_ELEMENTS.has(name)) {
-              rawHtmlDepth--;
-            }
-            if (matchesStack) popFrame();
-          } else if (matchesStack) {
-            // Matched real close tag
-            rawHtmlDepth--;
-            emitRaw(getRawSlice(parser.startIndex, parser.endIndex));
-            popFrame();
-          } else {
-            // Unmatched real close tag in raw block — emit but don't change depth
-            emitRaw(getRawSlice(parser.startIndex, parser.endIndex));
-          }
-          if (rawHtmlDepth === 0) {
-            rawBlockContinuation = TYPE1_TAGS.has(name)
-              ? "sameline"
-              : "blankline";
-          }
-          if (!isImplied) lastEventEnd = parser.endIndex;
-          return;
-        }
-
-        // Unmatched closing tag — emit as raw HTML
-        const topFrame = stack[stack.length - 1];
-        if (!topFrame || topFrame.tag !== name) {
-          // Implied close of never-opened tag — no source content to emit
-          if (isImplied) {
-            lastEventEnd = parser.startIndex - 1;
+          const frame = popFrame();
+          if (!frame) {
+            lastEventEnd = parser.endIndex;
             return;
           }
-          const inInline =
-            isInsideTag("p") || isInsideTag("li") || !!collectingFrame();
-          if (inInline) {
-            emitOrCollect(getRawSlice(parser.startIndex, parser.endIndex));
-          } else if (!CONVERTED_TAGS.has(name)) {
-            ensureBlankLine();
-            emitRaw(getRawSlice(parser.startIndex, parser.endIndex));
-            rawBlockContinuation = "blankline";
+
+          // Removed element: skip markdown output, emit afterContent if replaced
+          if (frame.removed) {
+            if (frame.appendContent) emit(frame.appendContent);
+            if (frame.afterContent) emit(frame.afterContent);
+            for (const h of frame.endTagHandlers) h({ name });
+            lastEventEnd = parser.endIndex;
+            return;
           }
-          lastEventEnd = parser.endIndex;
-          return;
-        }
 
-        const frame = popFrame();
-        if (!frame) {
-          lastEventEnd = parser.endIndex;
-          return;
-        }
+          // Ancestor removed: skip everything for this child element
+          if (hasHandlers && isRemoved()) {
+            lastEventEnd = parser.endIndex;
+            return;
+          }
 
-        // Removed element: skip markdown output, emit afterContent if replaced
-        if (frame.removed) {
-          if (frame.appendContent) emit(frame.appendContent);
-          if (frame.afterContent) emit(frame.afterContent);
-          for (const h of frame.endTagHandlers) h({ name });
-          lastEventEnd = parser.endIndex;
-          return;
-        }
+          // Unwrapped non-converted tag: skip switch, but still emit suffix/after/handlers
+          if (frame.unwrapped && !CONVERTED_TAGS.has(name)) {
+            if (frame.appendContent) emitOrCollect(frame.appendContent);
+            if (frame.hSuffix) emitOrCollect(frame.hSuffix);
+            if (frame.afterContent) emit(frame.afterContent);
+            for (const h of frame.endTagHandlers) h({ name });
+            lastEventEnd = parser.endIndex;
+            return;
+          }
 
-        // Ancestor removed: skip everything for this child element
-        if (hasHandlers && isRemoved()) {
-          lastEventEnd = parser.endIndex;
-          return;
-        }
-
-        // Unwrapped non-converted tag: skip switch, but still emit suffix/after/handlers
-        if (frame.unwrapped && !CONVERTED_TAGS.has(name)) {
+          // Pre-switch: emit inner content override and append content
+          if (frame.innerContentOverride !== null)
+            emitOrCollect(frame.innerContentOverride);
           if (frame.appendContent) emitOrCollect(frame.appendContent);
-          if (frame.hSuffix) emitOrCollect(frame.hSuffix);
-          if (frame.afterContent) emit(frame.afterContent);
-          for (const h of frame.endTagHandlers) h({ name });
-          lastEventEnd = parser.endIndex;
-          return;
-        }
 
-        // Pre-switch: emit inner content override and append content
-        if (frame.innerContentOverride !== null) emitOrCollect(frame.innerContentOverride);
-        if (frame.appendContent) emitOrCollect(frame.appendContent);
-
-        switch (name) {
-          case "h1":
-          case "h2":
-          case "h3":
-          case "h4":
-          case "h5":
-          case "h6": {
-            const level = parseInt(name[1], 10);
-            let text = frame.textBuf;
-            // Replace newlines with spaces (headings must be single-line)
-            text = text.replace(/\n/g, " ");
-            // Escape trailing # to prevent CommonMark from stripping them
-            text = text.replace(/#+\s*$/, (m) => m.replace(/#/g, "\\#"));
-            const liFrame = currentLiFrame;
-            const bp = !liFrame ? buildPrefix() : "";
-            emit(`${bp + "#".repeat(level)} ${text}\n`);
-            // Set flag for heading in list item
-            if (liFrame) {
-              afterHeadingInLi = true;
+          switch (name) {
+            case "h1":
+            case "h2":
+            case "h3":
+            case "h4":
+            case "h5":
+            case "h6": {
+              const level = parseInt(name[1], 10);
+              let text = frame.textBuf;
+              // Replace newlines with spaces (headings must be single-line)
+              text = text.replace(/\n/g, " ");
+              // Escape trailing # to prevent CommonMark from stripping them
+              text = text.replace(/#+\s*$/, (m) => m.replace(/#/g, "\\#"));
+              const liFrame = currentLiFrame;
+              const bp = !liFrame ? buildPrefix() : "";
+              emit(`${bp + "#".repeat(level)} ${text}\n`);
+              // Set flag for heading in list item
+              if (liFrame) {
+                afterHeadingInLi = true;
+              }
+              break;
             }
-            break;
-          }
 
-          case "p":
-            ensureNewline();
-            break;
-
-          case "blockquote":
-            if (frame.attrs._bqMode === "pending") {
-              // Still pending at close → empty blockquote, resolve now
-              resolveBqToMarkdown(frame);
-            }
-            if (outputLen === frame.outputLen) {
-              // Empty blockquote — emit bare `>`
-              emit(`${buildPrefix()}>\n`);
-            } else {
+            case "p":
               ensureNewline();
-            }
-            break;
+              break;
 
-          case "code": {
-            if (inPre) {
-              const content = decodeHTML(frame.textBuf);
-              const lang = frame.langOverride || frame.attrs._lang || "";
-              // Choose fence that doesn't conflict with content
-              let fence = "```";
-              if (content.includes("```")) {
-                if (!content.includes("~~~")) {
-                  fence = "~~~";
-                } else {
-                  // Find longest run of backticks or tildes and use longer
-                  const backtickRuns = content.match(/`+/g) || [];
-                  const maxBt = Math.max(
-                    0,
-                    ...backtickRuns.map((r: string) => r.length),
-                  );
-                  fence = "`".repeat(maxBt + 1);
-                }
+            case "blockquote":
+              if (frame.attrs._bqMode === "pending") {
+                // Still pending at close → empty blockquote, resolve now
+                resolveBqToMarkdown(frame);
               }
-              const prefix = buildPrefix();
-              // If we're on the same line as a bullet, don't add prefix to opening fence
-              const onBulletLine =
-                isInsideTag("li") && trailingNewlines() === 0;
-              // Opening fence
-              if (onBulletLine) {
-                emit(`${fence + lang}\n`);
+              if (outputLen === frame.outputLen) {
+                // Empty blockquote — emit bare `>`
+                emit(`${buildPrefix()}>\n`);
               } else {
-                emit(`${prefix + fence + lang}\n`);
+                ensureNewline();
               }
-              // Content lines - add prefix to each line
-              const lines = content.split("\n");
-              for (let li = 0; li < lines.length; li++) {
-                if (li === lines.length - 1 && lines[li] === "") break;
-                emit(`${prefix + lines[li]}\n`);
-              }
-              // Closing fence
-              emit(`${prefix + fence}\n`);
-            } else {
-              // Emit collected code span with appropriate backtick wrapping
-              const code = decodeHTML(frame.textBuf);
-              let ticks = "`";
-              // If content contains backticks, use double (or more) backticks
-              if (code.includes("`")) {
-                // Find the longest run of backticks in the content
-                const runs = code.match(/`+/g) || [];
-                const maxRun = Math.max(0, ...runs.map((r) => r.length));
-                ticks = "`".repeat(maxRun + 1);
-              }
-              // If content starts or ends with backtick or space, add spaces
-              let inner = code;
-              if (
-                ticks.length > 1 ||
-                code.startsWith("`") ||
-                code.endsWith("`")
-              ) {
+              break;
+
+            case "code": {
+              if (inPre) {
+                const content = decodeHTML(frame.textBuf);
+                const lang = frame.langOverride || frame.attrs._lang || "";
+                // Choose fence that doesn't conflict with content
+                let fence = "```";
+                if (content.includes("```")) {
+                  if (!content.includes("~~~")) {
+                    fence = "~~~";
+                  } else {
+                    // Find longest run of backticks or tildes and use longer
+                    const backtickRuns = content.match(/`+/g) || [];
+                    const maxBt = Math.max(
+                      0,
+                      ...backtickRuns.map((r: string) => r.length),
+                    );
+                    fence = "`".repeat(maxBt + 1);
+                  }
+                }
+                const prefix = buildPrefix();
+                // If we're on the same line as a bullet, don't add prefix to opening fence
+                const onBulletLine =
+                  isInsideTag("li") && trailingNewlines() === 0;
+                // Opening fence
+                if (onBulletLine) {
+                  emit(`${fence + lang}\n`);
+                } else {
+                  emit(`${prefix + fence + lang}\n`);
+                }
+                // Content lines - add prefix to each line
+                const lines = content.split("\n");
+                for (let li = 0; li < lines.length; li++) {
+                  if (li === lines.length - 1 && lines[li] === "") break;
+                  emit(`${prefix + lines[li]}\n`);
+                }
+                // Closing fence
+                emit(`${prefix + fence}\n`);
+              } else {
+                // Emit collected code span with appropriate backtick wrapping
+                const code = decodeHTML(frame.textBuf);
+                let ticks = "`";
+                // If content contains backticks, use double (or more) backticks
+                if (code.includes("`")) {
+                  // Find the longest run of backticks in the content
+                  const runs = code.match(/`+/g) || [];
+                  const maxRun = Math.max(0, ...runs.map((r) => r.length));
+                  ticks = "`".repeat(maxRun + 1);
+                }
+                // If content starts or ends with backtick or space, add spaces
+                let inner = code;
                 if (
-                  code.startsWith(" ") ||
-                  code.endsWith(" ") ||
+                  ticks.length > 1 ||
                   code.startsWith("`") ||
                   code.endsWith("`")
                 ) {
-                  inner = ` ${code} `;
+                  if (
+                    code.startsWith(" ") ||
+                    code.endsWith(" ") ||
+                    code.startsWith("`") ||
+                    code.endsWith("`")
+                  ) {
+                    inner = ` ${code} `;
+                  }
                 }
+                emitOrCollect(ticks + inner + ticks);
               }
-              emitOrCollect(ticks + inner + ticks);
-            }
-            break;
-          }
-
-          case "pre":
-            inPre = false;
-            break;
-
-          case "strong":
-          case "b":
-            emitInlineClose(name, frame, "**", isImplied);
-            break;
-          case "em":
-          case "i": {
-            const marker = frame.attrs._emMarker || "*";
-            emitInlineClose(name, frame, marker, isImplied);
-            break;
-          }
-
-          case "del":
-          case "s":
-            emitInlineClose(name, frame, "~~", isImplied);
-            break;
-
-          case "a": {
-            if (!frame.collecting) {
-              // <a> without href was emitted as raw HTML; emit closing tag only if real
-              if (!isImplied) emitOrCollect("</a>");
               break;
             }
-            if (isImplied) {
-              // Unclosed <a> — emit as raw HTML to preserve original structure
-              emitOrCollect(reconstructTag("a", frame.attrs) + frame.textBuf);
+
+            case "pre":
+              inPre = false;
+              break;
+
+            case "strong":
+            case "b":
+              emitInlineClose(name, frame, "**", isImplied);
+              break;
+            case "em":
+            case "i": {
+              const marker = frame.attrs._emMarker || "*";
+              emitInlineClose(name, frame, marker, isImplied);
               break;
             }
-            let href = frame.attrs.href || "";
-            const title = frame.attrs.title;
-            const text = frame.textBuf;
 
-            // If preceding char is !, emitting [text](url) would create image syntax.
-            // Emit as raw HTML link instead.
-            if (tail.endsWith("!")) {
-              const titleAttr = title ? ` title="${title}"` : "";
-              const md = `<a href="${href}"${titleAttr}>${text}</a>`;
+            case "del":
+            case "s":
+              emitInlineClose(name, frame, "~~", isImplied);
+              break;
+
+            case "a": {
+              if (!frame.collecting) {
+                // <a> without href was emitted as raw HTML; emit closing tag only if real
+                if (!isImplied) emitOrCollect("</a>");
+                break;
+              }
+              if (isImplied) {
+                // Unclosed <a> — emit as raw HTML to preserve original structure
+                emitOrCollect(reconstructTag("a", frame.attrs) + frame.textBuf);
+                break;
+              }
+              let href = frame.attrs.href || "";
+              const title = frame.attrs.title;
+              const text = frame.textBuf;
+
+              // If preceding char is !, emitting [text](url) would create image syntax.
+              // Emit as raw HTML link instead.
+              if (tail.endsWith("!")) {
+                const titleAttr = title ? ` title="${title}"` : "";
+                const md = `<a href="${href}"${titleAttr}>${text}</a>`;
+                const pc = collectingFrame();
+                if (pc) pc.textBuf += md;
+                else emit(md);
+                break;
+              }
+
+              // Escape parentheses in URL to avoid breaking markdown link syntax
+              const needsAngleBrackets =
+                href.includes(")") || href.includes(" ");
+              let md: string;
+              if (needsAngleBrackets) {
+                href = `<${href}>`;
+                md = title
+                  ? `[${text}](${href} "${title}")`
+                  : `[${text}](${href})`;
+              } else if (title) {
+                // Escape quotes in title
+                const escapedTitle = title.replace(/"/g, '\\"');
+                md = `[${text}](${href} "${escapedTitle}")`;
+              } else {
+                md = `[${text}](${href})`;
+              }
               const pc = collectingFrame();
               if (pc) pc.textBuf += md;
               else emit(md);
               break;
             }
 
-            // Escape parentheses in URL to avoid breaking markdown link syntax
-            const needsAngleBrackets = href.includes(")") || href.includes(" ");
-            let md: string;
-            if (needsAngleBrackets) {
-              href = `<${href}>`;
-              md = title
-                ? `[${text}](${href} "${title}")`
-                : `[${text}](${href})`;
-            } else if (title) {
-              // Escape quotes in title
-              const escapedTitle = title.replace(/"/g, '\\"');
-              md = `[${text}](${href} "${escapedTitle}")`;
-            } else {
-              md = `[${text}](${href})`;
-            }
-            const pc = collectingFrame();
-            if (pc) pc.textBuf += md;
-            else emit(md);
-            break;
-          }
-
-          case "ul":
-          case "ol":
-            break;
-          case "li":
-            ensureNewline();
-            // Track looseness on parent list frame for next <li>
-            {
-              const parentList = stack[stack.length - 1];
-              if (
-                parentList &&
-                (parentList.tag === "ul" || parentList.tag === "ol")
-              ) {
-                parentList.lastItemLoose = frame.hasParagraph;
+            case "ul":
+            case "ol":
+              break;
+            case "li":
+              ensureNewline();
+              // Track looseness on parent list frame for next <li>
+              {
+                const parentList = stack[stack.length - 1];
+                if (
+                  parentList &&
+                  (parentList.tag === "ul" || parentList.tag === "ol")
+                ) {
+                  parentList.lastItemLoose = frame.hasParagraph;
+                }
               }
-            }
-            break;
+              break;
 
-          case "th":
-          case "td": {
-            if (!frame.collecting) break; // raw HTML table — nothing to emit
-            let text = frame.textBuf;
-            // Escape unescaped pipes in cell text (they break GFM table syntax)
-            text = text.replace(/(?<!\\)\|/g, "\\|");
-            // Track alignment on the <table> frame if header separator not yet emitted
-            const tableFrame = currentTableFrame;
-            if (tableFrame && !tableFrame.tableHeaderDone) {
-              const alignAttr = frame.attrs.align;
-              const style = frame.attrs.style || "";
-              const alignMatch = style.match(
-                /text-align:\s*(left|center|right)/,
-              );
-              const align = alignAttr || (alignMatch ? alignMatch[1] : null);
-              tableFrame.tableAlignments.push(align);
-            }
-            // Increment cell count on the <tr> frame
-            const trFrame = findFrame("tr");
-            if (trFrame) trFrame.tableCellIndex++;
-            // Emit cell: "| text "
-            const prefix = buildPrefix();
-            const needsPrefix = trailingNewlines() >= 1 || !hasEmitted;
-            const pfx = needsPrefix ? prefix : "";
-            emit(`${pfx}| ${text} `);
-            break;
-          }
-
-          case "tr": {
-            const tableFrame = currentTableFrame;
-            if (!tableFrame?.attrs._tableGfm) break; // raw HTML table
-            // Close the row: emit trailing pipe + newline
-            emit("|\n");
-            // If header separator not yet emitted, emit it now
-            if (!tableFrame.tableHeaderDone) {
+            case "th":
+            case "td": {
+              if (!frame.collecting) break; // raw HTML table — nothing to emit
+              let text = frame.textBuf;
+              // Escape unescaped pipes in cell text (they break GFM table syntax)
+              text = text.replace(/(?<!\\)\|/g, "\\|");
+              // Track alignment on the <table> frame if header separator not yet emitted
+              const tableFrame = currentTableFrame;
+              if (tableFrame && !tableFrame.tableHeaderDone) {
+                const alignAttr = frame.attrs.align;
+                const style = frame.attrs.style || "";
+                const alignMatch = style.match(
+                  /text-align:\s*(left|center|right)/,
+                );
+                const align = alignAttr || (alignMatch ? alignMatch[1] : null);
+                tableFrame.tableAlignments.push(align);
+              }
+              // Increment cell count on the <tr> frame
+              const trFrame = findFrame("tr");
+              if (trFrame) trFrame.tableCellIndex++;
+              // Emit cell: "| text "
               const prefix = buildPrefix();
-              emit(prefix);
-              for (const align of tableFrame.tableAlignments) {
-                if (align === "center") emit("| :---: ");
-                else if (align === "right") emit("| ---: ");
-                else if (align === "left") emit("| :--- ");
-                else emit("| --- ");
-              }
+              const needsPrefix = trailingNewlines() >= 1 || !hasEmitted;
+              const pfx = needsPrefix ? prefix : "";
+              emit(`${pfx}| ${text} `);
+              break;
+            }
+
+            case "tr": {
+              const tableFrame = currentTableFrame;
+              if (!tableFrame?.attrs._tableGfm) break; // raw HTML table
+              // Close the row: emit trailing pipe + newline
               emit("|\n");
-              tableFrame.tableHeaderDone = true;
+              // If header separator not yet emitted, emit it now
+              if (!tableFrame.tableHeaderDone) {
+                const prefix = buildPrefix();
+                emit(prefix);
+                for (const align of tableFrame.tableAlignments) {
+                  if (align === "center") emit("| :---: ");
+                  else if (align === "right") emit("| ---: ");
+                  else if (align === "left") emit("| :--- ");
+                  else emit("| --- ");
+                }
+                emit("|\n");
+                tableFrame.tableHeaderDone = true;
+              }
+              break;
             }
-            break;
+
+            case "thead":
+            case "tbody":
+              break;
+            case "table":
+              if (frame.attrs._tableGfm) ensureNewline();
+              break;
+
+            // Tags not in CONVERTED_TAGS that need explicit closing in inline context
+            case "ins":
+            case "mark":
+            case "abbr":
+            case "sub":
+            case "sup":
+            case "small":
+            case "u":
+            case "q":
+            case "cite":
+            case "dfn":
+            case "kbd":
+            case "samp":
+            case "var":
+            case "time":
+            case "bdi":
+            case "bdo":
+            case "ruby":
+            case "rt":
+            case "span":
+            case "div":
+            case "section":
+            case "nav":
+            case "details":
+            case "summary":
+            case "figure":
+            case "figcaption": {
+              if (isImplied) break; // self-closing or unclosed — no close tag in source
+              const inInline =
+                isInsideTag("p") || isInsideTag("li") || !!collectingFrame();
+              if (inInline) {
+                emitOrCollect(getRawSlice(parser.startIndex, parser.endIndex));
+              }
+              break;
+            }
+
+            default:
+              break;
           }
 
-          case "thead":
-          case "tbody":
-            break;
-          case "table":
-            if (frame.attrs._tableGfm) ensureNewline();
-            break;
+          // Post-switch: emit suffix, afterContent, fire endTag handlers
+          if (frame.hSuffix) emitOrCollect(frame.hSuffix);
+          if (frame.afterContent) emit(frame.afterContent);
+          for (const h of frame.endTagHandlers) h({ name });
 
-          // Tags not in CONVERTED_TAGS that need explicit closing in inline context
-          case "ins":
-          case "mark":
-          case "abbr":
-          case "sub":
-          case "sup":
-          case "small":
-          case "u":
-          case "q":
-          case "cite":
-          case "dfn":
-          case "kbd":
-          case "samp":
-          case "var":
-          case "time":
-          case "bdi":
-          case "bdo":
-          case "ruby":
-          case "rt":
-          case "span":
-          case "div":
-          case "section":
-          case "nav":
-          case "details":
-          case "summary":
-          case "figure":
-          case "figcaption": {
-            if (isImplied) break; // self-closing or unclosed — no close tag in source
-            const inInline =
-              isInsideTag("p") || isInsideTag("li") || !!collectingFrame();
-            if (inInline) {
-              emitOrCollect(getRawSlice(parser.startIndex, parser.endIndex));
-            }
-            break;
+          // Implied close tags are synthetic — they don't consume real input
+          // characters, so they must not advance lastEventEnd past the
+          // triggering tag.  flushGap already tracked any gap it emitted.
+          if (!isImplied) {
+            lastEventEnd = parser.endIndex;
           }
-
-          default:
-            break;
-        }
-
-        // Post-switch: emit suffix, afterContent, fire endTag handlers
-        if (frame.hSuffix) emitOrCollect(frame.hSuffix);
-        if (frame.afterContent) emit(frame.afterContent);
-        for (const h of frame.endTagHandlers) h({ name });
-
-        // Implied close tags are synthetic — they don't consume real input
-        // characters, so they must not advance lastEventEnd past the
-        // triggering tag.  flushGap already tracked any gap it emitted.
-        if (!isImplied) {
-          lastEventEnd = parser.endIndex;
-        }
         }
       },
 
@@ -1732,9 +1781,14 @@ export function createMarkdownStream(
         // Fire document-level comment handlers
         if (hasDocHandlers) {
           const comment: MDComment = {
-            get text() { return _data; },
+            get text() {
+              return _data;
+            },
             removed: false,
-            remove() { this.removed = true; return comment; },
+            remove() {
+              this.removed = true;
+              return comment;
+            },
           };
           for (const dh of documentHandlers as DocumentHandler[]) {
             if (dh.comments) dh.comments(comment);
@@ -1750,10 +1804,19 @@ export function createMarkdownStream(
         if (streamCommentHandlers.length > 0) {
           let _removed = false;
           const comment: MDComment = {
-            get text() { return _data; },
-            get removed() { return _removed; },
-            set removed(v: boolean) { _removed = v; },
-            remove() { _removed = true; return comment; },
+            get text() {
+              return _data;
+            },
+            get removed() {
+              return _removed;
+            },
+            set removed(v: boolean) {
+              _removed = v;
+            },
+            remove() {
+              _removed = true;
+              return comment;
+            },
           };
           for (const ch of streamCommentHandlers) ch(comment);
           if (_removed) {
@@ -1845,7 +1908,12 @@ export function createMarkdownStream(
       // Fire document-level end handlers
       if (hasDocHandlers) {
         for (const dh of documentHandlers as DocumentHandler[]) {
-          if (dh.end) dh.end({ append(content: string) { emit(content); } });
+          if (dh.end)
+            dh.end({
+              append(content: string) {
+                emit(content);
+              },
+            });
         }
       }
     },

@@ -351,7 +351,10 @@ function matchChain(chain: SelectorChain, matchStack: MatchContext[]): boolean {
       // Adjacent sibling combinator — must match immediately preceding sibling
       if (stackIdx < 0) return false;
       const parentCtx = matchStack[stackIdx];
-      if (!parentCtx.lastChildCtx || !matchCompound(part.compound, parentCtx.lastChildCtx))
+      if (
+        !parentCtx.lastChildCtx ||
+        !matchCompound(part.compound, parentCtx.lastChildCtx)
+      )
         return false;
       // Stay at same stack level (parent) for further chain parts
       stackIdx--;

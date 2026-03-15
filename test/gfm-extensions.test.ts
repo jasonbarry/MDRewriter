@@ -51,7 +51,7 @@ function parseGfmSpec(specText: string): GfmExample[] {
 }
 
 const specText = readFileSync(
-  new URL("./fixtures/gfm-spec.txt", import.meta.url),
+  new URL("./fixtures/spec/gfm-spec.txt", import.meta.url),
   "utf8",
 );
 const examples = parseGfmSpec(specText);

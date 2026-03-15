@@ -3,36 +3,36 @@
  * Run with: bun test/download-fixtures.ts
  */
 
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SITES = [
+  "https://arxiv.org/html/2603.11152v1",
+  "https://blog.cloudflare.com/",
   "https://claude.com/blog/1m-context-ga",
-  "https://workos.com/blog/agents-need-authorization-not-just-authentication",
-  "https://simonwillison.net/guides/agentic-engineering-patterns/code-is-cheap/",
-  "https://steipete.me/posts/2026/openclaw",
-  "https://www.calebleak.com/posts/dog-game/",
+  "https://css-tricks.com/",
+  "https://dev.to/",
+  "https://developer.mozilla.org/en-US/docs/Web/HTML",
+  "https://doc.rust-lang.org/book/",
+  "https://docs.python.org/3/tutorial/index.html",
   "https://en.wikipedia.org/wiki/Artificial_intelligence",
   "https://github.com/commonmark/commonmark-spec",
-  "https://developer.mozilla.org/en-US/docs/Web/HTML",
+  "https://jvns.ca/blog/2026/03/10/examples-for-the-tcpdump-and-dig-man-pages/",
+  "https://karpathy.bearblog.dev/power-to-the-people/",
   "https://news.ycombinator.com/",
-  "https://stackoverflow.com/questions/tagged/markdown",
-  "https://www.bbc.com/news",
-  "https://www.nytimes.com/2026/01/22/movies/2026-oscar-nominees-list.html",
-  "https://www.reddit.com/r/programming/",
-  "https://medium.com/",
-  "https://dev.to/",
-  "https://docs.python.org/3/tutorial/index.html",
-  "https://doc.rust-lang.org/book/",
-  "https://www.w3.org/TR/html52/",
-  "https://www.nasa.gov/",
-  "https://archive.org/",
-  "https://www.npmjs.com/",
-  "https://blog.cloudflare.com/",
-  "https://www.smashingmagazine.com/",
-  "https://css-tricks.com/",
+  "https://simonwillison.net/guides/agentic-engineering-patterns/code-is-cheap/",
   "https://spec.commonmark.org/0.31.2/",
+  "https://stackoverflow.com/questions/tagged/markdown",
+  "https://steipete.me/posts/2026/openclaw",
+  "https://workos.com/blog/series-c",
+  "https://www.bbc.com/news",
+  "https://www.calebleak.com/posts/dog-game/",
+  "https://www.nasa.gov/",
+  "https://www.nytimes.com/",
+  "https://www.reddit.com/r/programming/",
+  "https://www.smashingmagazine.com/",
+  "https://www.w3.org/TR/html52/",
 ];
 
 function urlToFilename(url: string): string {

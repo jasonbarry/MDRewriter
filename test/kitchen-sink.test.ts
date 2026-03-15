@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MDRewriter } from "../src/index";
 
-const fixturesDir = resolve(__dirname, "fixtures");
+const fixturesDir = resolve(__dirname, "fixtures/spec");
 const html = readFileSync(resolve(fixturesDir, "kitchen-sink.html"), "utf8");
 const expectedMd = readFileSync(
   resolve(fixturesDir, "kitchen-sink.md"),

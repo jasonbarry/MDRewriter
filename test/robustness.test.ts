@@ -51,23 +51,27 @@ describe("Robustness & Edge Cases", () => {
     });
 
     it("<STRONG>bold</STRONG> in paragraph", () => {
-      expect(new MDRewriter().transform("<P><STRONG>bold</STRONG></P>")).toContain(
-        "**bold**",
-      );
+      expect(
+        new MDRewriter().transform("<P><STRONG>bold</STRONG></P>"),
+      ).toContain("**bold**");
     });
 
     it('<A HREF="/url">link</A> in paragraph', () => {
-      expect(new MDRewriter().transform('<P><A HREF="/url">link</A></P>')).toContain(
-        "[link](/url)",
-      );
+      expect(
+        new MDRewriter().transform('<P><A HREF="/url">link</A></P>'),
+      ).toContain("[link](/url)");
     });
 
     it("mixed case <Em>italic</eM> in paragraph", () => {
-      expect(new MDRewriter().transform("<P><Em>italic</eM></P>")).toContain("*italic*");
+      expect(new MDRewriter().transform("<P><Em>italic</eM></P>")).toContain(
+        "*italic*",
+      );
     });
 
     it("<UL><LI>item</LI></UL>", () => {
-      expect(new MDRewriter().transform("<UL><LI>item</LI></UL>")).toContain("- item");
+      expect(new MDRewriter().transform("<UL><LI>item</LI></UL>")).toContain(
+        "- item",
+      );
     });
 
     it("uppercase and lowercase produce identical output", () => {
@@ -188,7 +192,9 @@ describe("Robustness & Edge Cases", () => {
     });
 
     it('<img src="x" alt="y"/> → ![y](x)', () => {
-      const result = new MDRewriter().transform('<p><img src="x" alt="y"/></p>');
+      const result = new MDRewriter().transform(
+        '<p><img src="x" alt="y"/></p>',
+      );
       expect(result).toContain("![y](x)");
     });
 
@@ -213,7 +219,9 @@ describe("Robustness & Edge Cases", () => {
   // =========================================================================
   describe("Web Components & Custom Elements", () => {
     it("<my-widget>content</my-widget> at block level → raw HTML passthrough", () => {
-      const result = new MDRewriter().transform("<my-widget>content</my-widget>");
+      const result = new MDRewriter().transform(
+        "<my-widget>content</my-widget>",
+      );
       expect(result).toContain("<my-widget>");
       expect(result).toContain("content");
       expect(result).toContain("</my-widget>");
@@ -230,7 +238,9 @@ describe("Robustness & Edge Cases", () => {
 
     it("nested custom elements → no crash", () => {
       expect(() =>
-        new MDRewriter().transform("<x-outer><x-inner>deep</x-inner></x-outer>"),
+        new MDRewriter().transform(
+          "<x-outer><x-inner>deep</x-inner></x-outer>",
+        ),
       ).not.toThrow();
     });
 
@@ -342,11 +352,9 @@ describe("Robustness & Edge Cases", () => {
 
     it("alternating inline elements 20 levels deep → no crash, text preserved", () => {
       let html = "<p>";
-      for (let i = 0; i < 20; i++)
-        html += i % 2 === 0 ? "<em>" : "<strong>";
+      for (let i = 0; i < 20; i++) html += i % 2 === 0 ? "<em>" : "<strong>";
       html += "text";
-      for (let i = 19; i >= 0; i--)
-        html += i % 2 === 0 ? "</em>" : "</strong>";
+      for (let i = 19; i >= 0; i--) html += i % 2 === 0 ? "</em>" : "</strong>";
       html += "</p>";
       const result = new MDRewriter().transform(html);
       expect(result).toContain("text");
@@ -454,7 +462,9 @@ describe("Robustness & Edge Cases", () => {
     });
 
     it("style content passes through as raw HTML", () => {
-      const result = new MDRewriter().transform("<style>p { color: red; }</style>");
+      const result = new MDRewriter().transform(
+        "<style>p { color: red; }</style>",
+      );
       expect(result).toContain("<style>");
       expect(result).toContain("</style>");
     });

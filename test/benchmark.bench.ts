@@ -12,7 +12,7 @@ import { MDRewriter } from "../src/index";
 // ---------------------------------------------------------------------------
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const fixturesDir = path.resolve(__dirname, "fixtures/real-world");
+const fixturesDir = path.resolve(__dirname, "fixtures/html");
 const files = fs
   .readdirSync(fixturesDir)
   .filter((f) => f.endsWith(".html"))
@@ -49,9 +49,15 @@ const nhm = new NodeHtmlMarkdown();
 function countNodes(html: string): number {
   let count = 0;
   const parser = new HtmlParser({
-    onopentag() { count++; },
-    ontext() { count++; },
-    oncomment() { count++; },
+    onopentag() {
+      count++;
+    },
+    ontext() {
+      count++;
+    },
+    oncomment() {
+      count++;
+    },
   });
   parser.end(html);
   return count;
@@ -144,7 +150,6 @@ async function main() {
       turndown: get("Turndown"),
       nhm: get("node-html-markdown"),
     });
-
   }
   process.stderr.write("\n\n");
 
@@ -177,9 +182,16 @@ async function main() {
       formatCell(r.nhm.hz, r.nhm.p99).padStart(cellW),
       formatCell(r.mdrewriter.hz, r.mdrewriter.p99).padStart(cellW),
     ];
-    const colored = colorRank(cells, [r.turndown.hz, r.nhm.hz, r.mdrewriter.hz]);
+    const colored = colorRank(cells, [
+      r.turndown.hz,
+      r.nhm.hz,
+      r.mdrewriter.hz,
+    ]);
     const row = [
-      r.name.replace(/\.html$/, "").replace(/_.*/, "").padEnd(nameW),
+      r.name
+        .replace(/\.html$/, "")
+        .replace(/_.*/, "")
+        .padEnd(nameW),
       r.nodes.toLocaleString().padStart(nodesW),
       formatSize(r.size).padStart(sizeW),
       ...colored,

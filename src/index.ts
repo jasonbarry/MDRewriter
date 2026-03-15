@@ -1,6 +1,10 @@
 import { parseSelector } from "./selector";
 import { createMarkdownStream, htmlToMarkdown } from "./stream";
-import type { DocumentHandler, ElementHandler, HandlerRegistration } from "./types";
+import type {
+  DocumentHandler,
+  ElementHandler,
+  HandlerRegistration,
+} from "./types";
 
 // ---------------------------------------------------------------------------
 // MDRewriter class
@@ -53,10 +57,15 @@ export class MDRewriter {
     const writer = writable.getWriter();
     const encoder = new TextEncoder();
     const regs = this.registrations.length > 0 ? this.registrations : undefined;
-    const docHandlers = this.documentHandlers.length > 0 ? this.documentHandlers : undefined;
-    const mdStream = createMarkdownStream((chunk) => {
-      writer.write(encoder.encode(chunk));
-    }, regs, docHandlers);
+    const docHandlers =
+      this.documentHandlers.length > 0 ? this.documentHandlers : undefined;
+    const mdStream = createMarkdownStream(
+      (chunk) => {
+        writer.write(encoder.encode(chunk));
+      },
+      regs,
+      docHandlers,
+    );
     (async () => {
       try {
         while (true) {
@@ -73,7 +82,6 @@ export class MDRewriter {
       headers: { "content-type": "text/markdown; charset=utf-8" },
     });
   }
-
 }
 
 export default MDRewriter;

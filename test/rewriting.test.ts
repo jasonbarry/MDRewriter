@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { MDRewriter } from "../src/index";
-import type { MDElement } from "../src/types";
 
 /** Shorthand: create an MDRewriter, apply setup, convert HTML to markdown. */
 function rewrite(html: string, setup: (r: MDRewriter) => void): string {
@@ -357,14 +356,12 @@ describe("Mutation Interactions", () => {
   });
 
   it("replace() suppresses original content", () => {
-    const md = rewrite(
-      "<p>Original <strong>bold</strong> text</p>",
-      (r) =>
-        r.on("p", {
-          element(el) {
-            el.replace("REPLACED");
-          },
-        }),
+    const md = rewrite("<p>Original <strong>bold</strong> text</p>", (r) =>
+      r.on("p", {
+        element(el) {
+          el.replace("REPLACED");
+        },
+      }),
     );
     expect(md).toContain("REPLACED");
     expect(md).not.toContain("Original");
@@ -372,15 +369,13 @@ describe("Mutation Interactions", () => {
   });
 
   it("setLanguage() + prefix on code block", () => {
-    const md = rewrite(
-      "<pre><code>const x = 1;</code></pre>",
-      (r) =>
-        r.on("code", {
-          element(el) {
-            el.setLanguage("typescript");
-            el.prefix = "// Code:\n";
-          },
-        }),
+    const md = rewrite("<pre><code>const x = 1;</code></pre>", (r) =>
+      r.on("code", {
+        element(el) {
+          el.setLanguage("typescript");
+          el.prefix = "// Code:\n";
+        },
+      }),
     );
     expect(md).toContain("```typescript");
     expect(md).toContain("const x = 1;");
@@ -674,13 +669,11 @@ describe("Handler Execution Order", () => {
   it("ignore() before on() — element removed", () => {
     let handlerFired = false;
     const md = rewrite('<div class="ads">Ad content</div>', (r) =>
-      r
-        .ignore(".ads")
-        .on(".ads", {
-          element() {
-            handlerFired = true;
-          },
-        }),
+      r.ignore(".ads").on(".ads", {
+        element() {
+          handlerFired = true;
+        },
+      }),
     );
     // ignore() registered first removes the element
     expect(md).not.toContain("Ad content");
@@ -722,13 +715,15 @@ describe("Handler Execution Order", () => {
 // ===========================================================================
 describe("Advanced Selector + Handler Integration", () => {
   it("ID selector #main", () => {
-    const md = rewrite('<div id="main"><p>Content</p></div><div id="other"><p>Other</p></div>', (r) =>
-      r.on("#main", {
-        element(el) {
-          el.removeAndKeepContent();
-          el.prefix = ">>>";
-        },
-      }),
+    const md = rewrite(
+      '<div id="main"><p>Content</p></div><div id="other"><p>Other</p></div>',
+      (r) =>
+        r.on("#main", {
+          element(el) {
+            el.removeAndKeepContent();
+            el.prefix = ">>>";
+          },
+        }),
     );
     expect(md).toContain(">>>");
     expect(md).toContain("Content");
@@ -775,12 +770,14 @@ describe("Advanced Selector + Handler Integration", () => {
 
   it('attribute ends-with [src$=".png"]', () => {
     let matchedSrc = "";
-    rewrite('<p><img src="photo.png" alt="png"> <img src="photo.jpg" alt="jpg"></p>', (r) =>
-      r.on('[src$=".png"]', {
-        element(el) {
-          matchedSrc = el.getAttribute("src") || "";
-        },
-      }),
+    rewrite(
+      '<p><img src="photo.png" alt="png"> <img src="photo.jpg" alt="jpg"></p>',
+      (r) =>
+        r.on('[src$=".png"]', {
+          element(el) {
+            matchedSrc = el.getAttribute("src") || "";
+          },
+        }),
     );
     expect(matchedSrc).toBe("photo.png");
   });
@@ -942,14 +939,12 @@ describe("Converted Element Mutations", () => {
   });
 
   it("list: remove() on ul", () => {
-    const md = rewrite(
-      "<ul><li>One</li><li>Two</li></ul><p>After</p>",
-      (r) =>
-        r.on("ul", {
-          element(el) {
-            el.remove();
-          },
-        }),
+    const md = rewrite("<ul><li>One</li><li>Two</li></ul><p>After</p>", (r) =>
+      r.on("ul", {
+        element(el) {
+          el.remove();
+        },
+      }),
     );
     expect(md).not.toContain("One");
     expect(md).not.toContain("Two");
@@ -1188,13 +1183,11 @@ describe("Real-World Patterns", () => {
       </body></html>
     `;
     const md = rewrite(html, (r) =>
-      r
-        .ignore("nav, footer")
-        .on("article", {
-          element(el) {
-            el.removeAndKeepContent();
-          },
-        }),
+      r.ignore("nav, footer").on("article", {
+        element(el) {
+          el.removeAndKeepContent();
+        },
+      }),
     );
     expect(md).toContain("# Article Title");
     expect(md).toContain("Article body text.");
