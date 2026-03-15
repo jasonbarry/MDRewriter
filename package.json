@@ -1,17 +1,25 @@
 {
   "name": "mdrewriter",
-  "version": "1.0.1",
-  "description": "Fast streaming HTML-to-markdown converter, 100% CommonMark + GFM",
+  "version": "1.0.2",
+  "description": "Fast streaming HTML-to-markdown converter, 100% CommonMark + GFM extensions",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "keywords": [
     "markdown",
     "html-to-markdown",
-    "converter"
+    "converter",
+    "turndown"
   ],
   "author": "Jason Barry",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jasonbarry/MDRewriter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jasonbarry/MDRewriter/issues"
+  },
   "scripts": {
     "bench": "tsx test/benchmark.bench.ts",
     "bench:parser": "tsx test/parser.bench.ts",

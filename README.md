@@ -118,13 +118,13 @@ export default {
 
 MDRewriter's advantage grows as pages get larger. On a log-log scatterplot of p99 latency vs DOM node count:
 
-![p99 latency vs DOM nodes](docs/scatterplot.png)
+![p99 latency vs DOM nodes](https://raw.githubusercontent.com/jasonbarry/MDRewriter/refs/heads/main/docs/scatterplot.png)
 
 ```
 $ pnpm bench
 ```
 
-![benchmarks comparing turndown, node-html-markdown, and mdrewriter](docs/bench-table.png)
+![benchmarks comparing turndown, node-html-markdown, and mdrewriter](https://raw.githubusercontent.com/jasonbarry/MDRewriter/refs/heads/main/docs/bench-table.png)
 
 ### htmlparser-benchmark (258 real-world HTML files)
 
