@@ -1,161 +1,37 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { Parser as HtmlParser } from "htmlparser2";
 import { NodeHtmlMarkdown } from "node-html-markdown";
+import { Bench } from "tinybench";
 import TurndownService from "turndown";
-import { bench, describe } from "vitest";
 import { MDRewriter } from "../src/index";
 
 // ---------------------------------------------------------------------------
-// Test fixture builder — generates HTML to a target byte size
+// Load real-world HTML fixtures, sorted by size ascending
 // ---------------------------------------------------------------------------
 
-// Rotating section templates that exercise different tag combinations.
-// Each call to buildHtml cycles through all templates so the benchmark
-// covers the full range of HTML→Markdown conversions.
-
-const sectionTemplates = [
-  // 0 — headings, basic inline formatting, links
-  (i: number) => `<section>
-<h1>Section ${i}: Main Heading</h1>
-<h2>Subheading with <code>inline code</code></h2>
-<h3>Tertiary heading</h3>
-<p>This is paragraph <strong>number ${i}</strong> with <em>various</em> inline <code>formatting</code> elements.</p>
-<p>Here's a <a href="https://example.com/page/${i}">link to page ${i}</a> and a <a href="https://example.com/other" title="titled link">titled link</a>.</p>
-</section>\n`,
-
-  // 1 — unordered list, ordered list, nested lists
-  (i: number) => `<section>
-<h2>Lists (${i})</h2>
-<ul>
-<li>Item one with <strong>bold</strong></li>
-<li>Item two with <em>emphasis</em></li>
-<li>Item three with <code>code</code></li>
-<li>Nested:
-<ul>
-<li>Sub-item A</li>
-<li>Sub-item B with <a href="https://example.com">a link</a></li>
-</ul>
-</li>
-</ul>
-<ol>
-<li>First ordered item</li>
-<li>Second with <b>bold (b tag)</b> and <i>italic (i tag)</i></li>
-<li>Third item</li>
-</ol>
-</section>\n`,
-
-  // 2 — code blocks, blockquotes, horizontal rules
-  (i: number) => `<section>
-<h2>Code &amp; Quotes (${i})</h2>
-<pre><code class="language-javascript">function example${i}() {
-  const x = ${i};
-  return x * 2;
-}
-</code></pre>
-<pre><code class="language-python">def example_${i}():
-    return ${i} * 2
-</code></pre>
-<blockquote><p>This is a blockquote in section ${i}.</p>
-<blockquote><p>Nested blockquote with <strong>bold</strong> text.</p></blockquote></blockquote>
-<hr>
-</section>\n`,
-
-  // 3 — images, line breaks, strikethrough, sub/sup
-  (i: number) => `<section>
-<h2>Media &amp; Inline HTML (${i})</h2>
-<p><img src="https://example.com/img/${i}.png" alt="Image ${i}"> followed by text.</p>
-<p>Line one.<br>Line two after a break.<br>Line three.</p>
-<p><del>Deleted text ${i}</del> and <s>strikethrough text</s>.</p>
-<p>H<sub>2</sub>O is water. E = mc<sup>2</sup>.</p>
-<p><ins>Inserted text</ins> and <mark>highlighted text</mark>.</p>
-</section>\n`,
-
-  // 4 — tables
-  (i: number) => `<section>
-<h2>Table (${i})</h2>
-<table>
-<thead>
-<tr><th>Name</th><th>Value</th><th>Description</th></tr>
-</thead>
-<tbody>
-<tr><td>Alpha</td><td>${i * 10}</td><td>First row with <strong>bold</strong></td></tr>
-<tr><td>Beta</td><td>${i * 20}</td><td>Second row with <em>emphasis</em></td></tr>
-<tr><td>Gamma</td><td>${i * 30}</td><td>Third row with <code>code</code></td></tr>
-</tbody>
-</table>
-</section>\n`,
-
-  // 5 — task lists, definition-like content, details/summary
-  (i: number) => `<section>
-<h2>Interactive (${i})</h2>
-<ul>
-<li><input type="checkbox" disabled> Unchecked task ${i}</li>
-<li><input type="checkbox" checked disabled> Checked task ${i}</li>
-<li><input type="checkbox" disabled> Another task with <a href="https://example.com">link</a></li>
-</ul>
-<details>
-<summary>Click to expand section ${i}</summary>
-<p>Hidden content with <strong>formatting</strong> and <code>code</code>.</p>
-</details>
-<dl>
-<dt>Term ${i}</dt>
-<dd>Definition with <em>emphasis</em> and <a href="#">a link</a>.</dd>
-</dl>
-</section>\n`,
-
-  // 6 — mixed inline: kbd, abbr, small, time, nested emphasis
-  (i: number) => `<section>
-<h2>Rich Inline (${i})</h2>
-<p>Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to copy. The <abbr title="HyperText Markup Language">HTML</abbr> spec is large.</p>
-<p><small>Small print for section ${i}.</small></p>
-<p>Published on <time datetime="2025-01-${String((i % 28) + 1).padStart(2, "0")}">January ${(i % 28) + 1}, 2025</time>.</p>
-<p><strong><em>Bold italic</em></strong> and <em><strong>italic bold</strong></em> and <em><code>italic code</code></em>.</p>
-<p>A paragraph with <strong>bold containing <em>nested italic</em> text</strong> and trailing words.</p>
-</section>\n`,
-
-  // 7 — figures, nav, footer, script/style (ignored content)
-  (i: number) => `<section>
-<h2>Structural (${i})</h2>
-<figure>
-<img src="https://example.com/fig/${i}.jpg" alt="Figure ${i}">
-<figcaption>Figure ${i}: A sample diagram</figcaption>
-</figure>
-<nav><a href="/prev">Previous</a> | <a href="/next">Next</a></nav>
-<article>
-<h3>Embedded article ${i}</h3>
-<p>Article body with <a href="https://example.com/article/${i}">a deep link</a>.</p>
-</article>
-<footer><p>Footer for section ${i}.</p></footer>
-<div class="sidebar"><p>Sidebar content ${i}.</p></div>
-</section>\n`,
-];
-
-function buildHtml(targetBytes: number): string {
-  const header = "<html><body>\n";
-  const footer = "</body></html>\n";
-  const sections: string[] = [header];
-  let size = header.length + footer.length;
-  let i = 0;
-
-  while (size < targetBytes) {
-    const template = sectionTemplates[i % sectionTemplates.length];
-    const section = template(i);
-    sections.push(section);
-    size += section.length;
-    i++;
-  }
-
-  sections.push(footer);
-  return sections.join("");
-}
-
-const TINY_HTML = buildHtml(10 * 1024); // 10 KB
-const SMALL_HTML = buildHtml(100 * 1024); // 100 KB
-const MEDIUM_HTML = buildHtml(512 * 1024); // 512 KB
-const LARGE_HTML = buildHtml(1024 * 1024); // 1 MB
-const HUGE_HTML = buildHtml(2 * 1024 * 1024); // 2 MB
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const fixturesDir = path.resolve(__dirname, "fixtures/real-world");
+const files = fs
+  .readdirSync(fixturesDir)
+  .filter((f) => f.endsWith(".html"))
+  .map((f) => {
+    const html = fs.readFileSync(path.join(fixturesDir, f), "utf8");
+    return {
+      name: f,
+      html,
+      size: fs.statSync(path.join(fixturesDir, f)).size,
+      nodes: countNodes(html),
+    };
+  })
+  .sort((a, b) => a.nodes - b.nodes);
 
 // ---------------------------------------------------------------------------
-// Turndown instance (reused across iterations like a real app would)
+// Shared library instances (reused across iterations like a real app would)
 // ---------------------------------------------------------------------------
+
+const mdRewriter = new MDRewriter();
 
 const turndown = new TurndownService({
   headingStyle: "atx",
@@ -164,82 +40,157 @@ const turndown = new TurndownService({
   bulletListMarker: "-",
 });
 
-// ---------------------------------------------------------------------------
-// node-html-markdown instance (reused across iterations like a real app would)
-// ---------------------------------------------------------------------------
-
-// const nhm = new NodeHtmlMarkdown();
+const nhm = new NodeHtmlMarkdown();
 
 // ---------------------------------------------------------------------------
-// Benchmarks
+// Formatting helpers
 // ---------------------------------------------------------------------------
 
-describe("tiny HTML (~10KB)", () => {
-  bench("MDRewriter", () => {
-    new MDRewriter().transform(TINY_HTML);
+function countNodes(html: string): number {
+  let count = 0;
+  const parser = new HtmlParser({
+    onopentag() { count++; },
+    ontext() { count++; },
+    oncomment() { count++; },
   });
+  parser.end(html);
+  return count;
+}
 
-  bench("Turndown", () => {
-    turndown.turndown(TINY_HTML);
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+function formatHz(hz: number): string {
+  if (hz >= 1000) return `${Math.round(hz).toLocaleString()}`;
+  if (hz >= 100) return `${Math.round(hz)}`;
+  if (hz >= 10) return `${hz.toFixed(1)}`;
+  return `${hz.toFixed(2)}`;
+}
+
+function formatP99(ms: number): string {
+  if (ms >= 100) return `${Math.round(ms)}ms`;
+  if (ms >= 10) return `${ms.toFixed(1)}ms`;
+  return `${ms.toFixed(2)}ms`;
+}
+
+function formatCell(hz: number, p99: number): string {
+  return `${formatHz(hz).padStart(7)} ops/s ${formatP99(p99).padStart(8)}`;
+}
+
+const green = (s: string) => `\x1b[32m${s}\x1b[0m`;
+const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`;
+const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
+
+function colorRank(cells: string[], hzValues: number[]): string[] {
+  const sorted = [...hzValues].sort((a, b) => b - a);
+  return cells.map((cell, i) => {
+    if (hzValues[i] === sorted[0]) return green(cell);
+    if (hzValues[i] === sorted[sorted.length - 1]) return red(cell);
+    return yellow(cell);
   });
+}
 
-  // bench("node-html-markdown", () => {
-  //   nhm.translate(TINY_HTML);
-  // });
-});
+// ---------------------------------------------------------------------------
+// Run benchmarks
+// ---------------------------------------------------------------------------
 
-describe("small HTML (~100KB)", () => {
-  bench("MDRewriter", () => {
-    new MDRewriter().transform(SMALL_HTML);
-  });
+type FileResult = {
+  name: string;
+  size: number;
+  nodes: number;
+  mdrewriter: { hz: number; p99: number };
+  turndown: { hz: number; p99: number };
+  nhm: { hz: number; p99: number };
+};
 
-  bench("Turndown", () => {
-    turndown.turndown(SMALL_HTML);
-  });
+async function main() {
+  const results: FileResult[] = [];
 
-  // bench("node-html-markdown", () => {
-  //   nhm.translate(SMALL_HTML);
-  // });
-});
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    process.stderr.write(
+      `\rBenchmarking ${i + 1}/${files.length} real-world HTML files…`,
+    );
 
-describe("medium HTML (~512KB)", () => {
-  bench("MDRewriter", () => {
-    new MDRewriter().transform(MEDIUM_HTML);
-  });
+    const bench = new Bench({ iterations: 5, warmupIterations: 2 });
 
-  bench("Turndown", () => {
-    turndown.turndown(MEDIUM_HTML);
-  });
+    bench
+      .add("MDRewriter", () => {
+        mdRewriter.transform(file.html);
+      })
+      .add("Turndown", () => {
+        turndown.turndown(file.html);
+      })
+      .add("node-html-markdown", () => {
+        nhm.translate(file.html);
+      });
 
-  // bench("node-html-markdown", () => {
-  //   nhm.translate(MEDIUM_HTML);
-  // });
-});
+    await bench.warmup();
+    await bench.run();
 
-describe("large HTML (~1MB)", () => {
-  bench("MDRewriter", () => {
-    new MDRewriter().transform(LARGE_HTML);
-  });
+    const get = (name: string) => {
+      const task = bench.getTask(name);
+      const r = task!.result!;
+      return { hz: r.hz, p99: r.p99 };
+    };
 
-  bench("Turndown", () => {
-    turndown.turndown(LARGE_HTML);
-  });
+    results.push({
+      name: file.name,
+      size: file.size,
+      nodes: file.nodes,
+      mdrewriter: get("MDRewriter"),
+      turndown: get("Turndown"),
+      nhm: get("node-html-markdown"),
+    });
 
-  // bench("node-html-markdown", () => {
-  //   nhm.translate(LARGE_HTML);
-  // });
-});
+  }
+  process.stderr.write("\n\n");
 
-describe("huge HTML (~2MB)", () => {
-  bench("MDRewriter", () => {
-    new MDRewriter().transform(HUGE_HTML);
-  });
+  // ---------------------------------------------------------------------------
+  // Print consolidated table
+  // ---------------------------------------------------------------------------
 
-  bench("Turndown", () => {
-    turndown.turndown(HUGE_HTML);
-  });
+  const nameW = 26;
+  const sizeW = 12;
+  const nodesW = 8;
+  const cellW = 23;
 
-  // bench("node-html-markdown", () => {
-  //   nhm.translate(HUGE_HTML);
-  // });
+  const header = [
+    "Website".padEnd(nameW),
+    "Nodes".padStart(nodesW),
+    "Size".padStart(sizeW),
+    "Turndown".padStart(cellW),
+    "node-html-markdown".padStart(cellW),
+    "MDRewriter".padStart(cellW),
+  ].join(" ");
+
+  const separator = "─".repeat(header.length);
+
+  console.log(header);
+  console.log(separator);
+
+  for (const r of results) {
+    const cells = [
+      formatCell(r.turndown.hz, r.turndown.p99).padStart(cellW),
+      formatCell(r.nhm.hz, r.nhm.p99).padStart(cellW),
+      formatCell(r.mdrewriter.hz, r.mdrewriter.p99).padStart(cellW),
+    ];
+    const colored = colorRank(cells, [r.turndown.hz, r.nhm.hz, r.mdrewriter.hz]);
+    const row = [
+      r.name.replace(/\.html$/, "").replace(/_.*/, "").padEnd(nameW),
+      r.nodes.toLocaleString().padStart(nodesW),
+      formatSize(r.size).padStart(sizeW),
+      ...colored,
+    ].join(" ");
+    console.log(row);
+  }
+
+  console.log();
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
 });

@@ -7,7 +7,8 @@
   "author": "Jason Barry",
   "license": "MIT",
   "scripts": {
-    "bench": "vitest bench",
+    "bench": "tsx script/bench.ts",
+    "bench:files": "tsx test/benchmark.bench.ts",
     "build": "tsc",
     "lint": "biome check --write",
     "kitchen-sink": "tsx -e \"import{MDRewriter}from'./src/index.ts';import{readFileSync}from'fs';console.log(MDRewriter.string(readFileSync('test/fixtures/kitchen-sink.html','utf8')))\"",
@@ -26,6 +27,7 @@
     "@types/turndown": "5.0.6",
     "commonmark": "0.31.2",
     "commonmark-spec": "0.31.2",
+    "htmlparser-benchmark": "^1.1.3",
     "micromark": "4.0.2",
     "micromark-extension-gfm": "3.0.0",
     "node-html-markdown": "2.0.0",
