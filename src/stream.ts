@@ -762,7 +762,14 @@ export function createMarkdownStream(
         }
 
         // Typically-inline converted tags at block level → raw HTML block
-        if (!inInline && !frame.unwrapped && BLOCK_WHEN_TOPLEVEL.has(name)) {
+        // When handlers are registered, skip this: the caller is converting a
+        // webpage, not roundtripping markdown, so convert these tags normally.
+        if (
+          !hasHandlers &&
+          !inInline &&
+          !frame.unwrapped &&
+          BLOCK_WHEN_TOPLEVEL.has(name)
+        ) {
           ensureBlankLine();
           emitRaw(getRawSlice(parser.startIndex, parser.endIndex));
           if (!VOID_ELEMENTS.has(name)) rawHtmlDepth = 1;
@@ -1831,6 +1838,13 @@ export function createMarkdownStream(
           return;
         }
 
+        // When handlers are registered, skip raw block mode for comments
+        // so full HTML documents convert instead of passing through as raw HTML.
+        if (hasHandlers) {
+          lastEventEnd = parser.endIndex;
+          return;
+        }
+
         handleRawBlock(
           getRawSlice(parser.startIndex, parser.endIndex),
           "sameline",
@@ -1856,6 +1870,13 @@ export function createMarkdownStream(
 
         if (checkRawBlockContinuation()) {
           emitRaw(getRawSlice(parser.startIndex, parser.endIndex));
+          lastEventEnd = parser.endIndex;
+          return;
+        }
+
+        // When handlers are registered, skip raw block mode for PIs/doctypes
+        // so full HTML documents convert instead of passing through as raw HTML.
+        if (hasHandlers) {
           lastEventEnd = parser.endIndex;
           return;
         }

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mdrewriter test</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        padding: 24px;
+        max-width: 1400px;
+        margin: 0 auto;
+        color: #1a1a1a;
+      }
+      h1 {
+        font-size: 1.25rem;
+        margin-bottom: 16px;
+      }
+      .input-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 24px;
+      }
+      #url {
+        flex: 1;
+        padding: 10px 12px;
+        font-size: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-family: inherit;
+      }
+      #url:focus {
+        outline: none;
+        border-color: #666;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 1rem;
+        border: none;
+        border-radius: 6px;
+        background: #111;
+        color: #fff;
+        cursor: pointer;
+        font-family: inherit;
+        white-space: nowrap;
+      }
+      button:hover {
+        background: #333;
+      }
+      button:disabled {
+        background: #999;
+        cursor: not-allowed;
+      }
+      .columns {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+        gap: 16px;
+      }
+      .column h2 {
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .column .time {
+        font-size: 0.75rem;
+        color: #888;
+        margin-bottom: 8px;
+        min-height: 1.2em;
+      }
+      .column pre {
+        background: #f5f5f5;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 12px;
+        font-size: 0.8rem;
+        font-family:
+          "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        overflow-y: auto;
+        height: calc(100vh - 180px);
+        line-height: 1.5;
+      }
+      .error {
+        color: #c00;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>mdrewriter test</h1>
+
+    <div class="input-row">
+      <input
+        id="url"
+        type="text"
+        placeholder="Enter a URL, e.g. https://example.com"
+        autofocus
+      />
+      <button id="btn" onclick="convert()">Convert</button>
+    </div>
+
+    <div class="columns">
+      <div class="column">
+        <h2>mdrewriter</h2>
+        <div class="time" id="time-mdrewriter"></div>
+        <pre id="out-mdrewriter"></pre>
+      </div>
+      <div class="column">
+        <h2>Turndown</h2>
+        <div class="time" id="time-turndown"></div>
+        <pre id="out-turndown"></pre>
+      </div>
+      <div class="column">
+        <h2>node-html-markdown</h2>
+        <div class="time" id="time-nhm"></div>
+        <pre id="out-nhm"></pre>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/turndown/lib/turndown.browser.umd.js"></script>
+    <script type="module">
+      import { MDRewriter } from "https://esm.sh/mdrewriter@latest";
+      import { NodeHtmlMarkdown } from "https://esm.sh/node-html-markdown";
+
+      const urlInput = document.getElementById("url");
+      urlInput.value = "https://en.wikipedia.org/wiki/Artificial_intelligence";
+      const btn = document.getElementById("btn");
+
+      urlInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") convert();
+      });
+
+      window.convert = async function convert() {
+        const url = urlInput.value.trim();
+        if (!url) return;
+
+        btn.disabled = true;
+        btn.textContent = "Loading\u2026";
+
+        for (const id of ["mdrewriter", "turndown", "nhm"]) {
+          document.getElementById(`out-${id}`).textContent = "";
+          document.getElementById(`time-${id}`).textContent = "";
+        }
+
+        try {
+          const res = await fetch(
+            "https://corsproxy.io/?url=" + encodeURIComponent(url),
+          );
+          if (!res.ok) {
+            throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
+          }
+          const html = await res.text();
+
+          // mdrewriter
+          {
+            const t0 = performance.now();
+            const md = new MDRewriter()
+              .ignore("head, script, style, noscript, svg")
+              .transform(html);
+            const ms = (performance.now() - t0).toFixed(1);
+            document.getElementById("out-mdrewriter").textContent = md;
+            document.getElementById("time-mdrewriter").textContent = `${ms} ms`;
+          }
+
+          // Turndown
+          {
+            const t0 = performance.now();
+            const md = new TurndownService().turndown(html);
+            const ms = (performance.now() - t0).toFixed(1);
+            document.getElementById("out-turndown").textContent = md;
+            document.getElementById("time-turndown").textContent = `${ms} ms`;
+          }
+
+          // node-html-markdown
+          {
+            const t0 = performance.now();
+            const md = NodeHtmlMarkdown.translate(html);
+            const ms = (performance.now() - t0).toFixed(1);
+            document.getElementById("out-nhm").textContent = md;
+            document.getElementById("time-nhm").textContent = `${ms} ms`;
+          }
+        } catch (err) {
+          document.getElementById("out-mdrewriter").innerHTML =
+            `<span class="error">${err.message}</span>`;
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Convert";
+        }
+      };
+    </script>
+  </body>
+</html>

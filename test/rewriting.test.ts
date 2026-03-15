@@ -1369,6 +1369,38 @@ describe("Edge Cases", () => {
     expect(ret2).toBe(r);
   });
 
+  it("full HTML document with doctype converts to markdown when handlers are registered", () => {
+    const html =
+      '<!DOCTYPE html><html><head><title>Test</title><style>body{}</style></head><body><h1>Title</h1><p>Hello <a href="/url">link</a></p></body></html>';
+    const md = rewrite(html, (r) =>
+      r.ignore("head, script, style, noscript, svg"),
+    );
+    expect(md).toContain("# Title");
+    expect(md).toContain("[link](/url)");
+    expect(md).not.toContain("<!DOCTYPE");
+    expect(md).not.toContain("<html");
+    expect(md).not.toContain("<head");
+    expect(md).not.toContain("<body");
+  });
+
+  it("top-level inline tags convert instead of raw HTML when handlers are registered", () => {
+    const html = '<a href="/url">Link</a><p>Text</p>';
+    const md = rewrite(html, (r) =>
+      r.on("a", { element() {} }),
+    );
+    expect(md).toContain("[Link](/url)");
+    expect(md).not.toContain("<a ");
+  });
+
+  it("HTML comments are stripped when handlers are registered", () => {
+    const html = "<!-- comment --><p>Text</p>";
+    const md = rewrite(html, (r) =>
+      r.on("p", { element() {} }),
+    );
+    expect(md).toContain("Text");
+    expect(md).not.toContain("<!-- comment -->");
+  });
+
   it("no handlers = identical output to bare htmlToMarkdown", () => {
     const testCases = [
       "<h1>Hello</h1>",
